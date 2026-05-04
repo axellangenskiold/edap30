@@ -12,6 +12,8 @@ as `NotImplementedError`.
 """
 from __future__ import annotations
 
+import json
+
 from typing import List, Dict
 
 
@@ -42,6 +44,18 @@ def generate_samples(topic: str, n_samples: int) -> List[Dict[str, str]]:
       - Basic filtering (length > 40 chars, no duplicates) happens in the
         framework, so don't worry about it here.
     """
+    path = "/Users/axellangenskiold/edap30/nlp-student-kit/data/raw/home_renovation_raw.json"
+    
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    # Ensure output is strictly [{"text": "..."}]
+    formatted = [{"text": item["text"]} for item in data if "text" in item]
+
+    print(formatted[:3])
+    
+    return formatted
+    
     raise NotImplementedError(
         "Implement generate_samples(), or put .txt/.jsonl files in data/raw/ "
         "and run `make data` instead."
