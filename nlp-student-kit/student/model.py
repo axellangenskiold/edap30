@@ -1,0 +1,104 @@
+"""Your custom language model goes here.
+
+Study `reference/toy_rnn.py` first. Your model must expose the same interface:
+
+    class CustomLM(nn.Module):
+        forward(input_ids, targets=None) -> (logits, loss_or_None)
+        generate(input_ids, max_new_tokens, temperature, top_k) -> ids
+
+You must also provide `build_model(vocab_size, model_cfg)` and
+`config_to_dict(model)` at the bottom of this file, exactly like toy_rnn does.
+The framework calls these to construct and checkpoint your model.
+
+Recommended architecture: a small GPT-style Transformer (token embedding +
+positional embedding + Transformer blocks + LayerNorm + LM head). You are
+free to use `torch.nn.TransformerEncoderLayer` or implement attention
+yourself; both are fine for this assignment.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, asdict
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+@dataclass
+class CustomLMConfig:
+    vocab_size: int
+    block_size: int = 256
+    n_layer: int = 4
+    n_head: int = 4
+    n_embd: int = 256
+    dropout: float = 0.1
+
+
+class CustomLM(nn.Module):
+    """TODO: implement your custom causal language model.
+
+    Suggested layers:
+      - token embedding       nn.Embedding(vocab_size, n_embd)
+      - positional embedding  nn.Embedding(block_size, n_embd)
+      - N transformer blocks  (self-attention + MLP, with residual and LN)
+      - final LayerNorm
+      - output head           nn.Linear(n_embd, vocab_size)
+
+    Tip: parameter tying (self.head.weight = self.tok_emb.weight) trains
+    faster on small data.
+    """
+
+    def __init__(self, config: CustomLMConfig):
+        super().__init__()
+        self.config = config
+        # TODO: define your layers here.
+        raise NotImplementedError("Implement CustomLM.__init__")
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,              # shape (B, T)
+        targets: torch.Tensor | None = None,  # shape (B, T) or None
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
+        """Return (logits, loss). See toy_rnn.py for the pattern.
+
+        TODO:
+          1. Compute hidden states from input_ids.
+          2. Project to logits over the vocabulary.
+          3. If targets is not None, compute cross-entropy loss with
+             ignore_index=-100.
+        """
+        raise NotImplementedError("Implement CustomLM.forward")
+
+    @torch.no_grad()
+    def generate(
+        self,
+        input_ids: torch.Tensor,
+        max_new_tokens: int,
+        temperature: float = 1.0,
+        top_k: int | None = None,
+    ) -> torch.Tensor:
+        """Sample a continuation. You can copy this from toy_rnn.py almost
+        verbatim, but remember to truncate input_ids to the last
+        `config.block_size` tokens before each forward pass; unlike RNNs,
+        Transformers have a fixed context length.
+        """
+        # TODO: implement. See toy_rnn.generate for the template.
+        raise NotImplementedError("Implement CustomLM.generate")
+
+
+# Factory and checkpoint helpers (the framework calls these).
+def build_model(vocab_size: int, model_cfg: dict) -> CustomLM:
+    """Construct a CustomLM from a config dict."""
+    cfg = CustomLMConfig(
+        vocab_size=vocab_size,
+        block_size=model_cfg.get("block_size", 256),
+        n_layer=model_cfg.get("n_layer", 4),
+        n_head=model_cfg.get("n_head", 4),
+        n_embd=model_cfg.get("n_embd", 256),
+        dropout=model_cfg.get("dropout", 0.1),
+    )
+    return CustomLM(cfg)
+
+
+def config_to_dict(model: CustomLM) -> dict:
+    return asdict(model.config)

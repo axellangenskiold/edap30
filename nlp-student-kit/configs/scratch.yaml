@@ -1,0 +1,24 @@
+# Runs framework/train_scratch.py with YOUR custom LM in student/model.py.
+run_name: scratch
+
+model_module: student.model
+model:
+  block_size: 256
+  n_layer: 4
+  n_head: 4
+  n_embd: 256
+  dropout: 0.1
+
+train_file: data/train.jsonl
+eval_file:  data/eval.jsonl
+tokenizer:  gpt2
+
+batch_size: 16
+epochs: 3
+lr: 3.0e-4
+weight_decay: 0.1
+warmup_steps: 100
+log_every: 50
+
+ckpt_dir: checkpoints/scratch
+seed: 42

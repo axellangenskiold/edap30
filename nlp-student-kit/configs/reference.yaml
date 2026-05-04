@@ -1,0 +1,25 @@
+# Runs framework/train_scratch.py with the reference toy RNN.
+# Use this to sanity-check your pipeline before implementing CustomLM.
+run_name: reference
+
+model_module: reference.toy_rnn
+model:
+  n_embd: 128
+  n_hidden: 256
+  n_layer: 1
+  dropout: 0.1
+block_size: 128
+
+train_file: data/train.jsonl
+eval_file:  data/eval.jsonl
+tokenizer:  gpt2
+
+batch_size: 16
+epochs: 3
+lr: 1.0e-3
+weight_decay: 0.01
+warmup_steps: 100
+log_every: 50
+
+ckpt_dir: checkpoints/reference
+seed: 42

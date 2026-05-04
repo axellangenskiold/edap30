@@ -1,0 +1,18 @@
+# Runs framework/train_lora.py.
+# LoRA hyperparameters (r, alpha, dropout, target_modules) live in
+# student/lora_config.py, NOT in this file.
+run_name: lora
+
+train_file: data/train.jsonl
+eval_file:  data/eval.jsonl
+base_model: gpt2
+max_len: 256
+
+batch_size: 8
+epochs: 3
+lr: 2.0e-4
+weight_decay: 0.0
+log_every: 20
+
+ckpt_dir: checkpoints/lora
+seed: 42
