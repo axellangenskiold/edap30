@@ -1,0 +1,12 @@
+2026-05-04 10:22:27,775 | INFO | Config: {'run_name': 'reference', 'model_module': 'reference.toy_rnn', 'model': {'n_embd': 128, 'n_hidden': 256, 'n_layer': 1, 'dropout': 0.1}, 'block_size': 128, 'train_file': 'data/train.jsonl', 'eval_file': 'data/eval.jsonl', 'tokenizer': 'gpt2', 'batch_size': 16, 'epochs': 3, 'lr': 0.001, 'weight_decay': 0.01, 'warmup_steps': 100, 'log_every': 50, 'ckpt_dir': 'checkpoints/reference', 'seed': 42}
+2026-05-04 10:22:27,792 | INFO | Device: mps
+2026-05-04 10:22:28,529 | INFO | Tokens: train=763  eval=132
+2026-05-04 10:22:28,929 | INFO | Model: ToyRNN  params=19.74M
+2026-05-04 10:22:31,451 | INFO | epoch=0 step=0 loss=10.8307 lr=1.00e-05
+2026-05-04 10:22:42,904 | INFO | epoch=0 eval_loss=10.5568 ppl=38436.90
+2026-05-04 10:22:43,656 | INFO | New best eval_loss=10.5568 -> saved best.pt
+2026-05-04 10:22:47,133 | INFO | epoch=1 step=50 loss=7.4378 lr=5.10e-04
+2026-05-04 10:22:55,615 | INFO | epoch=1 eval_loss=9.4180 ppl=12307.47
+2026-05-04 10:22:56,381 | INFO | New best eval_loss=9.4180 -> saved best.pt
+2026-05-04 10:23:03,438 | INFO | epoch=2 step=100 loss=5.0530 lr=9.92e-04
+2026-05-04 10:23:08,941 | INFO | epoch=2 eval_loss=9.9237 ppl=20408.93

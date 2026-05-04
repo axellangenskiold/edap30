@@ -54,7 +54,7 @@ Each file under `student/` has a docstring with the exact signature, inputs,
 outputs, and hints. In summary:
 
 | File                      | What to implement                                | Reference              |
-|---------------------------|--------------------------------------------------|------------------------|
+| ------------------------- | ------------------------------------------------ | ---------------------- |
 | `student/model.py`        | `CustomLM`, your own GPT-style LM                | `reference/toy_rnn.py` |
 | `student/collect_data.py` | `generate_samples(topic, n)` via LLM API         | docstring              |
 | `student/lora_config.py`  | `get_lora_config()` returning `LoraConfig`       | PEFT docs              |
@@ -81,8 +81,8 @@ are supported.
 
 ```json
 [
-  {"text": "Your domain-specific sample here."},
-  {"text": "Another sample..."}
+  { "text": "Your domain-specific sample here." },
+  { "text": "Another sample..." }
 ]
 ```
 
