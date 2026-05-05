@@ -24,4 +24,11 @@ def get_lora_config() -> LoraConfig:
     Returns:
         A peft.LoraConfig instance.
     """
-    raise NotImplementedError("Return a peft.LoraConfig(...)")
+    return LoraConfig(
+        r=8,
+        lora_alpha=16,
+        lora_dropout=0.05,
+        target_modules=["c_attn"],
+        bias="none",
+        task_type=TaskType.CAUSAL_LM,
+    )
