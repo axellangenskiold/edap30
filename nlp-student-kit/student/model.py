@@ -89,7 +89,31 @@ class CustomLM(nn.Module):
           3. If targets is not None, compute cross-entropy loss with
              ignore_index=-100.
         """
-        raise NotImplementedError("Implement CustomLM.forward")
+        
+        B, T = input_ids.shape
+        assert T <= self.config.block_size, (
+            f"Sequence length {T} exceeds block_size {self.config.block_size}"
+        )
+
+        pos = torch.arange(T, device=input_ids.device)        # (T,)
+        tok = self.tok_emb(input_ids)                         # (B, T, E)
+        pos = self.pos_emb(pos)                               # (T, E)
+        x = self.drop(tok + pos)                              # (B, T, E)
+
+        causal_mask = nn.Transformer.generate_square_subsequent_mask(T).to(x.device)
+        x = self.blocks(x, mask=causal_mask, is_causal=True)  # (B, T, E)
+
+        x = self.ln_f(x)                                      # (B, T, E)
+        logits = self.head(x)                                 # (B, T, V)
+
+        loss = None
+        if targets is not None:
+            loss = F.cross_entropy(
+                logits.view(-1, logits.size(-1)),
+                targets.view(-1),
+                ignore_index=-100,
+            )
+        return logits, loss
 
     @torch.no_grad()
     def generate(
