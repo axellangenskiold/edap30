@@ -10,8 +10,8 @@ model:
   dropout: 0.1
 
 train_file: data/train.jsonl
-eval_file:  data/eval.jsonl
-tokenizer:  gpt2
+eval_file: data/eval.jsonl
+tokenizer: gpt2
 
 batch_size: 16
 epochs: 3
