@@ -52,7 +52,29 @@ class CustomLM(nn.Module):
         super().__init__()
         self.config = config
         # TODO: define your layers here.
-        raise NotImplementedError("Implement CustomLM.__init__")
+        
+        self.tok_emb = nn.Embedding(config.vocab_size, config.n_embd)
+        self.pos_emb = nn.Embedding(config.block_size, config.n_embd)
+        self.drop = nn.Dropout(config.dropout)
+
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=config.n_embd,
+            nhead=config.n_head,
+            dim_feedforward=4 * config.n_embd,
+            dropout=config.dropout,
+            activation="gelu",
+            batch_first=True,
+            norm_first=True,
+        )
+        self.blocks = nn.TransformerEncoder(encoder_layer, num_layers=config.n_layer)
+
+        self.ln_f = nn.LayerNorm(config.n_embd)
+        self.head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+
+        # Weight tying: share the embedding matrix with the output head.
+        self.head.weight = self.tok_emb.weight
+        
+        # raise NotImplementedError("Implement CustomLM.__init__")
 
     def forward(
         self,
