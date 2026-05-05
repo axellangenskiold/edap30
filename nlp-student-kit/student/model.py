@@ -128,8 +128,20 @@ class CustomLM(nn.Module):
         `config.block_size` tokens before each forward pass; unlike RNNs,
         Transformers have a fixed context length.
         """
-        # TODO: implement. See toy_rnn.generate for the template.
-        raise NotImplementedError("Implement CustomLM.generate")
+    
+        self.eval()
+        out = input_ids
+        for _ in range(max_new_tokens):
+            idx_cond = out[:, -self.config.block_size:]
+            logits, _ = self(idx_cond)
+            next_logits = logits[:, -1, :] / max(1e-8, temperature)
+            if top_k is not None:
+                v, _ = torch.topk(next_logits, min(top_k, next_logits.size(-1)))
+                next_logits[next_logits < v[:, [-1]]] = -float("inf")
+            probs = F.softmax(next_logits, dim=-1)
+            next_tok = torch.multinomial(probs, num_samples=1)
+            out = torch.cat([out, next_tok], dim=1)
+        return out
 
 
 # Factory and checkpoint helpers (the framework calls these).
