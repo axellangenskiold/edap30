@@ -1,0 +1,16 @@
+{
+  "eval_file": "data/eval.jsonl",
+  "n_rows": 100,
+  "base": {
+    "perplexity": 85.96807474978051
+  },
+  "reference": {
+    "perplexity": 1.3754605197851737
+  },
+  "scratch": {
+    "perplexity": 1.6204729105703775
+  },
+  "lora": {
+    "perplexity": 6.833783847669224
+  }
+}
