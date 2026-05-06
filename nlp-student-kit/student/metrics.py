@@ -31,8 +31,14 @@ def compute_cross_entropy(
     Note: use "sum", not "mean". The aggregator does the averaging, so
     per-batch token counts can differ without biasing the result.
     """
-    raise NotImplementedError("Implement compute_cross_entropy")
-
+    sum_nll = F.cross_entropy(
+        logits.view(-1, logits.size(-1)),
+        targets.view(-1),
+        ignore_index=ignore_index,
+        reduction="sum",
+    )
+    n_tokens = (targets != ignore_index).sum().item()
+    return sum_nll.item(), n_tokens
 
 def compute_perplexity(total_nll: float, total_tokens: int) -> float:
     """Aggregate a running NLL sum into a perplexity value.
@@ -45,4 +51,8 @@ def compute_perplexity(total_nll: float, total_tokens: int) -> float:
     Returns:
         Perplexity as a Python float.
     """
-    raise NotImplementedError("Implement compute_perplexity")
+    
+    if total_tokens == 0:
+        return float("inf")
+    avg_nll = total_nll / total_tokens
+    return math.exp(min(20.0, avg_nll))
