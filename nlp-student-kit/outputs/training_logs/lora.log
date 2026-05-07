@@ -16,3 +16,21 @@
 2026-05-05 14:33:28,317 | INFO | epoch=2 step=140 loss=2.8317
 2026-05-05 14:33:46,178 | INFO | epoch=2 eval_loss=1.9188 ppl=6.81
 2026-05-05 14:33:47,084 | INFO | New best eval_loss=1.9188 -> saved checkpoints/lora
+2026-05-07 02:58:39,969 | INFO | Config: {'run_name': 'lora', 'train_file': 'data/train.jsonl', 'eval_file': 'data/eval.jsonl', 'base_model': 'gpt2', 'max_len': 256, 'batch_size': 8, 'epochs': 3, 'lr': 0.0002, 'weight_decay': 0.0, 'log_every': 20, 'ckpt_dir': 'checkpoints/lora', 'seed': 42}
+2026-05-07 02:58:40,008 | INFO | Device: mps
+2026-05-07 03:00:12,431 | INFO | LoRA config: LoraConfig(task_type=<TaskType.CAUSAL_LM: 'CAUSAL_LM'>, peft_type=<PeftType.LORA: 'LORA'>, auto_mapping=None, peft_version='0.19.1', base_model_name_or_path=None, revision=None, inference_mode=False, r=8, target_modules={'c_attn'}, exclude_modules=None, lora_alpha=16, lora_dropout=0.05, fan_in_fan_out=False, bias='none', use_rslora=False, modules_to_save=None, init_lora_weights=True, layers_to_transform=None, layers_pattern=None, rank_pattern={}, alpha_pattern={}, megatron_config=None, megatron_core='megatron.core', trainable_token_indices=None, loftq_config={}, eva_config=None, corda_config=None, lora_ga_config=None, use_dora=False, alora_invocation_tokens=None, use_qalora=False, qalora_group_size=16, layer_replication=None, runtime_config=LoraRuntimeConfig(ephemeral_gpu_offload=False), lora_bias=False, target_parameters=None, use_bdlora=None, arrow_config=None, ensure_weight_tying=False)
+2026-05-07 03:00:12,850 | INFO | Trainable params: 0.295M
+2026-05-07 03:00:14,243 | INFO | epoch=0 step=0 loss=4.4505
+2026-05-07 03:00:41,440 | INFO | epoch=0 step=20 loss=4.0572
+2026-05-07 03:01:09,744 | INFO | epoch=0 step=40 loss=3.5266
+2026-05-07 03:01:34,969 | INFO | epoch=0 eval_loss=2.9348 ppl=18.82
+2026-05-07 03:02:21,175 | INFO | New best eval_loss=2.9348 -> saved checkpoints/lora
+2026-05-07 03:02:33,548 | INFO | epoch=1 step=60 loss=3.3045
+2026-05-07 03:03:01,661 | INFO | epoch=1 step=80 loss=3.0184
+2026-05-07 03:03:31,242 | INFO | epoch=1 step=100 loss=3.0326
+2026-05-07 03:03:46,554 | INFO | epoch=1 eval_loss=2.0807 ppl=8.01
+2026-05-07 03:04:32,778 | INFO | New best eval_loss=2.0807 -> saved checkpoints/lora
+2026-05-07 03:04:56,383 | INFO | epoch=2 step=120 loss=2.2069
+2026-05-07 03:05:25,145 | INFO | epoch=2 step=140 loss=2.0607
+2026-05-07 03:05:59,549 | INFO | epoch=2 eval_loss=1.6640 ppl=5.28
+2026-05-07 03:06:45,758 | INFO | New best eval_loss=1.6640 -> saved checkpoints/lora

@@ -10,3 +10,9 @@
 2026-05-06 16:24:58,729 | INFO | Evaluating scratch model: checkpoints/scratch/best.pt
 2026-05-06 16:25:12,069 | INFO | Evaluating LoRA adapter: checkpoints/lora
 2026-05-06 16:25:21,078 | INFO | Wrote outputs/metrics.json
+2026-05-07 03:06:50,262 | INFO | Eval rows: 106
+2026-05-07 03:06:50,262 | INFO | Evaluating base model: gpt2
+2026-05-07 03:08:32,626 | INFO | Evaluating reference model: checkpoints/reference/best.pt
+2026-05-07 03:08:59,599 | INFO | Evaluating scratch model: checkpoints/scratch/best.pt
+2026-05-07 03:09:29,142 | INFO | Evaluating LoRA adapter: checkpoints/lora
+2026-05-07 03:10:46,599 | INFO | Wrote outputs/metrics.json
