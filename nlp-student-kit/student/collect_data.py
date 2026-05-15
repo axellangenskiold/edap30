@@ -104,7 +104,7 @@ def generate_samples(topic: str, n_samples: int) -> List[Dict[str, str]]:
 
     system_prompt = (
         f"You generate diverse training data about: {topic}. "
-        f"Each sample is 80-200 words, self-contained, factual, and "
+        f"Each sample is 60-100 words, self-contained, factual, and "
         f"stylistically varied across samples. "
         f"Output JSON only - no commentary, no markdown."
     )
