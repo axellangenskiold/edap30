@@ -15,11 +15,12 @@ from __future__ import annotations
 import json
 import math
 import os
+import random
 from pathlib import Path
 from typing import List, Dict
 
 
-def _load_env_file(env_path: Path) -> None:
+def load_env_file(env_path: Path) -> None:
     if not env_path.exists():
         return
     for line in env_path.read_text().splitlines():
@@ -32,36 +33,68 @@ def _load_env_file(env_path: Path) -> None:
         )
 
 
+def get_random_prompt(topic: str, n_samples: int) -> str:
+    prompts = [
+        (
+            f"I need to generate data to fine tune an LLM on {topic}. "
+            f"The data should be structured as a JSON object with a "
+            f"\"samples\" array, where each entry has a \"text\" field, "
+            f"like this:\n"
+            f"{{\"samples\": [\n"
+            f"  {{\"text\": \"{{Thing related to {topic}}}: "
+            f"{{detailed explanation, materials, and steps}}\"}},\n"
+            f"  {{\"text\": \"...\"}}\n"
+            f"]}}\n\n"
+            f"I need {n_samples} samples. Use real, concrete examples "
+            f"drawn from {topic}; every example must be unique and cover "
+            f"a different sub-topic, technique, or scenario."
+        ),
+        (
+            f"I need to generate data to fine tune an LM on {topic}. "
+            f"The data should be structured as a JSON object with a "
+            f"\"samples\" array, where each entry has \"input\" and "
+            f"\"output\" fields, like this:\n"
+            f"{{\"samples\": [\n"
+            f"  {{\"input\": \"{{question asked by user about "
+            f"{topic}}}\", \"output\": \"{{detailed answer about "
+            f"{topic}}}\"}},\n"
+            f"  {{\"input\": \"...\", \"output\": \"...\"}}\n"
+            f"]}}\n\n"
+            f"I need {n_samples} unique entries. Use real, concrete "
+            f"examples drawn from {topic}; cover a wide range of "
+            f"questions and scenarios so no two entries overlap."
+        ),
+        (
+            f"I'm fine tuning a GPT-2 style model. I need you to "
+            f"generate data for it. I'm fine tuning the model on "
+            f"{topic}, so all data should be centered around {topic}. "
+            f"The structure should be a JSON object with a \"samples\" "
+            f"array, where each entry has \"instruction\" and \"output\" "
+            f"fields, like this:\n"
+            f"{{\"samples\": [\n"
+            f"  {{\"instruction\": \"{{question or task about "
+            f"{topic}}}\", \"output\": \"{{detailed answer about "
+            f"{topic}}}\"}},\n"
+            f"  {{\"instruction\": \"...\", \"output\": \"...\"}}\n"
+            f"]}}\n\n"
+            f"I need {n_samples} unique instructions. The returned "
+            f"object must contain only the JSON; no commentary, no "
+            f"markdown fences. Use a wide range of {topic}-related "
+            f"tasks so every instruction is distinct."
+        ),
+    ]
+    return random.choice(prompts)
+
+
 def generate_samples(topic: str, n_samples: int) -> List[Dict[str, str]]:
     """Generate `n_samples` training texts for `topic` via the LLM API.
 
-    Args:
-        topic:      short description of your chosen domain,
-                    for example "cooking recipes" or "Shakespearean sonnets".
-        n_samples:  number of text samples to produce (>= 500 is required).
-
-    Returns:
-        A list of dicts shaped like:
-            [{"text": "sample 1..."}, {"text": "sample 2..."}, ...]
-
-    TODO:
-      1. Design a system prompt that pins down style, length, and topic.
-      2. Vary the user prompt across calls so samples are diverse.
-      3. Call the LLM API. Use either the `anthropic` or `openai` client library.
-         Read the API key from an environment variable; never hard-code it.
-      4. Parse each response into one text sample (or several, if you prompt
-         the model to produce a batch).
-      5. Return the full list. The framework takes it from there.
-
-    Hints:
-      - Budget your API calls. Batching multiple samples per call is cheaper.
-      - Save raw API responses to data/raw/ so re-splitting is reproducible.
-      - Basic filtering (length > 40 chars, no duplicates) happens in the
-        framework, so don't worry about it here.
+    Splits `n_samples` into 10 batches and makes only 10 calls to the
+    LLM. Each call uses a random prompt from `get_random_prompt` so the
+    style varies across batches. Returns the combined results list.
     """
-    kit_root = Path(__file__).resolve().parents[1]
     project_root = Path(__file__).resolve().parents[2]
-    _load_env_file(project_root / ".env")
+    load_env_file(project_root / ".env")
 
     api_key = os.environ.get("API_KEY")
     if not api_key:
@@ -72,23 +105,21 @@ def generate_samples(topic: str, n_samples: int) -> List[Dict[str, str]]:
     from openai import OpenAI
     client = OpenAI(api_key=api_key)
 
-    batch_size = max(1, n_samples // 10)
-    n_calls = math.ceil(n_samples / batch_size)
+    n_calls = 10
+    batch_size = math.ceil(n_samples / n_calls)
 
     system_prompt = (
         f"You generate diverse training data about: {topic}. "
         f"Each sample is 80-200 words, self-contained, factual, and "
         f"stylistically varied across samples. "
-        f"Output JSON only — no commentary, no markdown."
+        f"Output JSON only - no commentary, no markdown."
     )
 
-    samples: List[Dict[str, str]] = []
-    raw_responses: List[str] = []
+    results: List[Dict[str, str]] = []
 
     for _ in range(n_calls):
-        prompt = get_random_prompt(topic, batch_size)
-        user_message = (prompt)
-        
+        user_message = get_random_prompt(topic, batch_size)
+
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -99,50 +130,22 @@ def generate_samples(topic: str, n_samples: int) -> List[Dict[str, str]]:
             temperature=0.9,
         )
         content = response.choices[0].message.content
-        raw_responses.append(content)
 
         try:
             payload = json.loads(content)
         except json.JSONDecodeError:
             continue
         for item in payload.get("samples", []):
-            if isinstance(item, dict) and isinstance(item.get("text"), str):
-                samples.append({"text": item["text"]})
+            if not isinstance(item, dict):
+                continue
+            if isinstance(item.get("text"), str):
+                results.append({"text": item["text"]})
+            elif isinstance(item.get("instruction"), str) and isinstance(item.get("output"), str):
+                rec = {"instruction": item["instruction"], "output": item["output"]}
+                if isinstance(item.get("input"), str) and item["input"].strip():
+                    rec["input"] = item["input"]
+                results.append(rec)
+            elif isinstance(item.get("input"), str) and isinstance(item.get("output"), str):
+                results.append({"instruction": item["input"], "output": item["output"]})
 
-        if len(samples) >= n_samples:
-            break
-
-    raw_dir = kit_root / "data" / "raw"
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    safe_topic = topic.replace(" ", "_").replace("/", "_")
-    (raw_dir / f"{safe_topic}_raw.json").write_text(
-        json.dumps(raw_responses, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
-
-    return samples[:n_samples]
-
-
-def get_random_prompt(topic: str, n_samples: int) -> str:
-    """Return a random prompt string for the given topic, to encourage diversity."""
-        
-    prompts = [
-        f"Write a detailed how-to guide related to {topic}.",
-        f"Give me an explanation of a concept in {topic}.",
-        f"Give an instruction on how to do {topic}.",
-        f"Provide a step-by-step tutorial on a specific aspect of {topic}.",
-        f"Describe a common problem and solution in {topic}.",
-    ]
-    
-    json_format = """
-        The output should be an array of objects, each with a "text" field containing the sample text, like this:
-        [{{"text": "sample 1..."}}, {{"text": "sample 2..."}}, ...]
-        OR
-        [{{"instruction": "...", "output": "..."}},
-            {{"instruction": "...", "input": "...", "output": "..."}},
-            ...]
-        """
-        
-    import random
-        
-    return f"{random.choice(prompts)}\n\n{json_format}"
+    return results[:n_samples]
