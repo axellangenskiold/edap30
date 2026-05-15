@@ -87,12 +87,6 @@ def get_random_prompt(topic: str, n_samples: int) -> str:
 
 
 def generate_samples(topic: str, n_samples: int) -> List[Dict[str, str]]:
-    """Generate `n_samples` training texts for `topic` via the LLM API.
-
-    Splits `n_samples` into 10 batches and makes only 10 calls to the
-    LLM. Each call uses a random prompt from `get_random_prompt` so the
-    style varies across batches. Returns the combined results list.
-    """
     project_root = Path(__file__).resolve().parents[2]
     load_env_file(project_root / ".env")
 
