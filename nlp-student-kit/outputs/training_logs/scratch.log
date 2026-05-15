@@ -680,3 +680,37 @@
 2026-05-09 17:17:17,498 | INFO | epoch=2 step=17100 loss=0.2144 lr=3.00e-05
 2026-05-09 17:17:51,608 | INFO | epoch=2 step=17150 loss=0.1866 lr=3.00e-05
 2026-05-09 17:22:42,502 | INFO | epoch=2 eval_loss=0.7249 ppl=2.06
+2026-05-15 15:39:43,147 | INFO | Config: {'run_name': 'scratch', 'model_module': 'student.model', 'model': {'block_size': 256, 'n_layer': 4, 'n_head': 4, 'n_embd': 256, 'dropout': 0.1}, 'train_file': 'data/train.jsonl', 'eval_file': 'data/eval.jsonl', 'tokenizer': 'gpt2', 'batch_size': 16, 'epochs': 3, 'lr': 0.0003, 'weight_decay': 0.1, 'warmup_steps': 100, 'log_every': 50, 'ckpt_dir': 'checkpoints/scratch', 'seed': 42}
+2026-05-15 15:39:43,168 | INFO | Device: mps
+2026-05-15 15:39:44,240 | INFO | Tokens: train=49650  eval=12316
+2026-05-15 15:39:44,662 | INFO | Model: CustomLM  params=16.09M
+2026-05-15 15:39:47,375 | INFO | epoch=0 step=0 loss=147.9583 lr=3.00e-06
+2026-05-15 15:40:34,038 | INFO | epoch=0 step=50 loss=51.5886 lr=1.53e-04
+2026-05-15 15:41:18,041 | INFO | epoch=0 step=100 loss=32.5860 lr=3.00e-04
+2026-05-15 15:42:00,166 | INFO | epoch=0 step=150 loss=25.7521 lr=3.00e-04
+2026-05-15 15:42:39,954 | INFO | epoch=0 step=200 loss=21.2596 lr=3.00e-04
+2026-05-15 15:43:23,630 | INFO | epoch=0 step=250 loss=17.7658 lr=3.00e-04
+2026-05-15 15:44:04,146 | INFO | epoch=0 step=300 loss=15.0660 lr=3.00e-04
+2026-05-15 15:44:43,607 | INFO | epoch=0 step=350 loss=12.6663 lr=3.00e-04
+2026-05-15 15:45:25,405 | INFO | epoch=0 step=400 loss=11.7394 lr=2.99e-04
+2026-05-15 15:46:13,808 | INFO | epoch=0 step=450 loss=9.7359 lr=2.99e-04
+2026-05-15 15:47:05,110 | INFO | epoch=0 step=500 loss=9.1247 lr=2.99e-04
+2026-05-15 15:47:49,291 | INFO | epoch=0 step=550 loss=8.6309 lr=2.98e-04
+2026-05-15 15:48:31,198 | INFO | epoch=0 step=600 loss=7.9919 lr=2.98e-04
+2026-05-15 15:49:11,187 | INFO | epoch=0 step=650 loss=7.6493 lr=2.98e-04
+2026-05-15 15:49:51,096 | INFO | epoch=0 step=700 loss=7.6142 lr=2.97e-04
+2026-05-15 15:50:33,479 | INFO | epoch=0 step=750 loss=7.4233 lr=2.97e-04
+2026-05-15 15:51:18,776 | INFO | epoch=0 step=800 loss=7.2069 lr=2.96e-04
+2026-05-15 15:52:01,021 | INFO | epoch=0 step=850 loss=7.0694 lr=2.96e-04
+2026-05-15 15:52:43,236 | INFO | epoch=0 step=900 loss=6.7158 lr=2.95e-04
+2026-05-15 15:53:26,067 | INFO | epoch=0 step=950 loss=6.5872 lr=2.94e-04
+2026-05-15 15:54:08,158 | INFO | epoch=0 step=1000 loss=6.3633 lr=2.94e-04
+2026-05-15 15:54:49,991 | INFO | epoch=0 step=1050 loss=6.4512 lr=2.93e-04
+2026-05-15 15:55:31,544 | INFO | epoch=0 step=1100 loss=6.2616 lr=2.92e-04
+2026-05-15 15:56:15,016 | INFO | epoch=0 step=1150 loss=6.0688 lr=2.91e-04
+2026-05-15 15:56:57,966 | INFO | epoch=0 step=1200 loss=6.0784 lr=2.90e-04
+2026-05-15 15:57:39,592 | INFO | epoch=0 step=1250 loss=6.0242 lr=2.90e-04
+2026-05-15 15:58:21,389 | INFO | epoch=0 step=1300 loss=6.0437 lr=2.89e-04
+2026-05-15 15:59:02,739 | INFO | epoch=0 step=1350 loss=5.8793 lr=2.88e-04
+2026-05-15 15:59:43,492 | INFO | epoch=0 step=1400 loss=5.9445 lr=2.87e-04
+2026-05-15 16:00:24,798 | INFO | epoch=0 step=1450 loss=5.8348 lr=2.86e-04
