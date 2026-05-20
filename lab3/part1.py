@@ -240,16 +240,75 @@ aug_history = train(model_aug, optimizer_aug, train_aug_dl, val_dl,
 
 # %% 10. Evaluate augmented model
 
-# TOOD: Evalute on the test-set
+model_aug.load_state_dict(torch.load("runs/aug/best.pt", map_location=device))
+plot_history(aug_history, "aug")
+full_eval(model_aug, "aug")
 
 # %% 11. Attempt another model for transfer-learning
 
-# TODO: Implement your new model
-    
+# Swap the backbone family entirely: EfficientNet-B0 (~5M params, mobile-inverted
+# bottlenecks) vs ResNet50 (~25M params, residual conv blocks). Same ImageNet
+# pretraining, but its weights ship with their own resize/crop and normalization
+# stats, so we build matched train/eval transforms for it.
+class FlowerNetEffNet(nn.Module):
+    def __init__(self, num_classes=NUM_CLASSES):
+        super().__init__()
+        self.backbone = models.efficientnet_b0(
+            weights=models.EfficientNet_B0_Weights.IMAGENET1K_V1
+        )
+        in_features = self.backbone.classifier[1].in_features
+        self.backbone.classifier[1] = nn.Linear(in_features, num_classes)
+
+    def forward(self, x):
+        return self.backbone(x)
+
+effnet_weights    = models.EfficientNet_B0_Weights.IMAGENET1K_V1
+effnet_preprocess = effnet_weights.transforms()
+
+train_effnet_transform = transforms.Compose([
+    transforms.RandomResizedCrop(effnet_preprocess.crop_size[0], scale=(0.7, 1.0)),
+    transforms.RandomHorizontalFlip(),
+    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+    transforms.RandomRotation(15),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=effnet_preprocess.mean, std=effnet_preprocess.std),
+])
+
+train_effnet_ds = datasets.ImageFolder("flower-splits/train",
+                                       transform=train_effnet_transform)
+val_effnet_ds   = datasets.ImageFolder("flower-splits/val",
+                                       transform=effnet_preprocess)
+test_effnet_ds  = datasets.ImageFolder("flower-splits/test",
+                                       transform=effnet_preprocess)
+
+train_effnet_dl = DataLoader(train_effnet_ds, batch_size=BATCH_SIZE, shuffle=True,
+                             num_workers=NUM_WORKERS, pin_memory=False)
+val_effnet_dl   = DataLoader(val_effnet_ds,   batch_size=BATCH_SIZE, shuffle=False,
+                             num_workers=NUM_WORKERS, pin_memory=False)
+test_effnet_dl  = DataLoader(test_effnet_ds,  batch_size=BATCH_SIZE, shuffle=False,
+                             num_workers=NUM_WORKERS, pin_memory=False)
+
 # %% 12. Train your new model
 
-# TODO: Reuse your train method and train on this new model
+model_effnet     = FlowerNetEffNet().to(device)
+optimizer_effnet = torch.optim.Adam(model_effnet.parameters(), lr=LR)
+effnet_history   = train(model_effnet, optimizer_effnet,
+                         train_effnet_dl, val_effnet_dl,
+                         num_epochs=NUM_EPOCHS * 2, name="effnet")
 
 # %% 13. Evaluate the new model
 
-# TODO: Evaluate your new model on the test dataset
+model_effnet.load_state_dict(torch.load("runs/effnet/best.pt", map_location=device))
+plot_history(effnet_history, "effnet")
+
+# full_eval uses the ResNet dataloaders; inline the loop with EffNet's instead.
+for split_name, dl in [("train", train_effnet_dl),
+                       ("val",   val_effnet_dl),
+                       ("test",  test_effnet_dl)]:
+    m = evaluate(model_effnet, dl, labels)
+    print(f"\n=== effnet / {split_name} ===")
+    print(f"loss={m['loss']:.4f}  acc={m['accuracy']:.4f}  "
+          f"macro_f1={m['macro_f1']:.4f}")
+    print(m["report"])
+    print("confusion matrix (rows=true, cols=pred):")
+    print(m["cm"])
