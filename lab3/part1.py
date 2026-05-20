@@ -21,7 +21,7 @@ BATCH_SIZE = 32
 NUM_EPOCHS = 10
 LR = 1e-3
 NUM_CLASSES = 5
-NUM_WORKERS = 4
+NUM_WORKERS = 0
 SEED = 42
 
 if torch.backends.mps.is_available():
@@ -30,6 +30,8 @@ elif torch.cuda.is_available():
     device = torch.device("cuda")
 else:
     device = torch.device("cpu")
+
+print(device)
 
 torch.manual_seed(SEED)
 
@@ -102,6 +104,7 @@ def evaluate(model, dl, labels):
                                           target_names=labels,
                                           digits=4, zero_division=0),
     }
+
 
 # Sanity check: evaluate runs end-to-end on a freshly-instantiated model.
 # Pretrained backbone + random head -> predictions should be ~chance (~20%).
