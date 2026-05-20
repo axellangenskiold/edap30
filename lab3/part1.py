@@ -1,9 +1,12 @@
 #%% 0. Imports
 
+import json
 from pathlib import Path
 
 import torch
 import torch.nn as nn
+from sklearn.metrics import (accuracy_score, classification_report,
+                             confusion_matrix, f1_score)
 from torch.utils.data import DataLoader
 from torchvision import datasets, models
 
@@ -59,16 +62,49 @@ class FlowerNet(nn.Module):
 # %% 4. Prediction function
 
 def predict_classes(model, x):
-    # TODO: Implement
-    pass
+    model.eval()
+    with torch.no_grad():
+        logits = model(x.to(device))
+        return logits.argmax(dim=1)
 
 # %% 5. Evaluate
 
 def evaluate(model, dl, labels):
-    # TODO: Implement
-    pass
+    model.eval()
+    criterion = nn.CrossEntropyLoss(reduction="sum")
 
-# TODO: Test your evaluation over an unitialized model
+    all_preds, all_targets = [], []
+    total_loss, total_count = 0.0, 0
+
+    with torch.no_grad():
+        for x, y in dl:
+            x, y = x.to(device), y.to(device)
+            logits = model(x)
+            total_loss += criterion(logits, y).item()
+            total_count += y.size(0)
+            all_preds.append(logits.argmax(dim=1).cpu())
+            all_targets.append(y.cpu())
+
+    y_pred = torch.cat(all_preds).numpy()
+    y_true = torch.cat(all_targets).numpy()
+
+    return {
+        "loss":     total_loss / total_count,
+        "accuracy": accuracy_score(y_true, y_pred),
+        "macro_f1": f1_score(y_true, y_pred, average="macro"),
+        "cm":       confusion_matrix(y_true, y_pred),
+        "report":   classification_report(y_true, y_pred,
+                                          target_names=labels,
+                                          digits=4, zero_division=0),
+    }
+
+# Sanity check: evaluate runs end-to-end on a freshly-instantiated model.
+# Pretrained backbone + random head -> predictions should be ~chance (~20%).
+_sanity = FlowerNet().to(device)
+_metrics = evaluate(_sanity, val_dl, labels)
+print(f"[sanity] untrained val: acc={_metrics['accuracy']:.4f} "
+      f"macro_f1={_metrics['macro_f1']:.4f} loss={_metrics['loss']:.4f}")
+del _sanity
 
 # %% 6. Main train loop
 def infinite_iter(dl):
@@ -76,10 +112,56 @@ def infinite_iter(dl):
         for item in dl:
             yield item
 
-# TODO: Implement your train function
 def train(model, optimizer, train_dl, val_dl, num_epochs, name):
-    # TODO: Implement
-    pass
+    criterion = nn.CrossEntropyLoss()
+    out_dir = Path("runs") / name
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    history = {"train_loss": [], "train_acc": [],
+               "val_loss":   [], "val_acc":   [], "val_macro_f1": []}
+    best_val_f1 = -1.0
+
+    for epoch in range(1, num_epochs + 1):
+        model.train()
+        running_loss, running_correct, running_total = 0.0, 0, 0
+
+        for x, y in train_dl:
+            x, y = x.to(device), y.to(device)
+
+            optimizer.zero_grad()
+            logits = model(x)
+            loss = criterion(logits, y)
+            loss.backward()
+            optimizer.step()
+
+            running_loss    += loss.item() * y.size(0)
+            running_correct += (logits.argmax(dim=1) == y).sum().item()
+            running_total   += y.size(0)
+
+        train_loss = running_loss    / running_total
+        train_acc  = running_correct / running_total
+        val = evaluate(model, val_dl, labels)
+
+        history["train_loss"].append(train_loss)
+        history["train_acc"].append(train_acc)
+        history["val_loss"].append(val["loss"])
+        history["val_acc"].append(val["accuracy"])
+        history["val_macro_f1"].append(val["macro_f1"])
+
+        print(f"[{name}] epoch {epoch}/{num_epochs}  "
+              f"train: loss={train_loss:.4f} acc={train_acc:.4f}  |  "
+              f"val: loss={val['loss']:.4f} acc={val['accuracy']:.4f} "
+              f"f1={val['macro_f1']:.4f}")
+
+        if val["macro_f1"] > best_val_f1:
+            best_val_f1 = val["macro_f1"]
+            torch.save(model.state_dict(), out_dir / "best.pt")
+
+    torch.save(model.state_dict(), out_dir / "last.pt")
+    with open(out_dir / "history.json", "w") as f:
+        json.dump(history, f, indent=2)
+
+    return history
 
 # %% 7. Train baseline
 model = FlowerNet().to(device)
