@@ -20,7 +20,7 @@ from torchvision import datasets, models, transforms
 
 BATCH_SIZE = 32
 NUM_EPOCHS = 10
-LR = 1e-3
+LR = 3e-4
 NUM_CLASSES = 5
 NUM_WORKERS = 4
 SEED = 42
@@ -34,10 +34,10 @@ else:
 
 torch.manual_seed(SEED)
 
-#%% 2. Prepare the dataset
+#%% 2. Dataset and DataLoaders
 
-# resize -> center crop -> ImageNet normalization
-weights = models.ResNet50_Weights.IMAGENET1K_V2
+# resize -> center crop -> ImageNet normalization (matched to the pretrained weights)
+weights = models.ConvNeXt_Tiny_Weights.IMAGENET1K_V1
 preprocess = weights.transforms()
 
 train_ds = datasets.ImageFolder("flower-splits/train", transform=preprocess)
@@ -56,27 +56,32 @@ test_dl  = DataLoader(test_ds,  batch_size=BATCH_SIZE, shuffle=False,
                       num_workers=NUM_WORKERS, pin_memory=False,
                       persistent_workers=NUM_WORKERS > 0)
 
-#%% 3. Model implementation
+#%% 3. Baseline model definition
 
+# ConvNeXt-Tiny: modern CNN (2022), ~28M params, ~82.5% ImageNet top-1.
+# Its classifier head is Sequential(LayerNorm2d, Flatten, Linear) -> replace the Linear.
 class FlowerNet(nn.Module):
     def __init__(self, num_classes=NUM_CLASSES):
         super().__init__()
-        self.backbone = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
-        in_features = self.backbone.fc.in_features
-        self.backbone.fc = nn.Linear(in_features, num_classes)
+        self.backbone = models.convnext_tiny(
+            weights=models.ConvNeXt_Tiny_Weights.IMAGENET1K_V1
+        )
+        in_features = self.backbone.classifier[2].in_features
+        self.backbone.classifier[2] = nn.Linear(in_features, num_classes)
 
     def forward(self, x):
         return self.backbone(x)
 
-# %% 4. Prediction function
+# %% 4. Prediction helper
 
+# Run inference on a single batch and return predicted class indices.
 def predict_classes(model, x):
     model.eval()
     with torch.no_grad():
         logits = model(x.to(device))
         return logits.argmax(dim=1)
 
-# %% 5. Evaluate
+# %% 5. Evaluation helper
 
 def evaluate(model, dl, labels):
     model.eval()
@@ -108,9 +113,7 @@ def evaluate(model, dl, labels):
     }
 
 
-# Sanity check: evaluate runs end-to-end on a freshly-instantiated model.
-# Pretrained backbone + random head -> predictions should be ~chance (~20%).
-# Guarded so DataLoader workers don't re-run training when they re-import this file.
+# Sanity check: load model before training and evaluate, should be ca 20%.
 if __name__ == "__main__":
     _sanity = FlowerNet().to(device)
     _metrics = evaluate(_sanity, val_dl, labels)
@@ -118,13 +121,9 @@ if __name__ == "__main__":
           f"macro_f1={_metrics['macro_f1']:.4f} loss={_metrics['loss']:.4f}")
     del _sanity
 
-# %% 6. Main train loop
-def infinite_iter(dl):
-    while True:
-        for item in dl:
-            yield item
+# %% 6. Training loop
 
-def train(model, optimizer, train_dl, val_dl, num_epochs, name):
+def train(model, optimizer, train_dl, val_dl, num_epochs, name, scheduler=None):
     criterion = nn.CrossEntropyLoss()
     out_dir = Path("runs") / name
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -149,6 +148,9 @@ def train(model, optimizer, train_dl, val_dl, num_epochs, name):
             running_loss    += loss.item() * y.size(0)
             running_correct += (logits.argmax(dim=1) == y).sum().item()
             running_total   += y.size(0)
+
+        if scheduler is not None:
+            scheduler.step()
 
         train_loss = running_loss    / running_total
         train_acc  = running_correct / running_total
@@ -175,15 +177,18 @@ def train(model, optimizer, train_dl, val_dl, num_epochs, name):
 
     return history
 
-# %% 7. Train baseline
+# %% 7. Train baseline model
 if __name__ == "__main__":
     model = FlowerNet().to(device)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=LR, weight_decay=1e-4)
+    # Cosine schedule: smoothly decays LR from initial value to ~0 over the run.
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=NUM_EPOCHS)
     baseline_history = train(model, optimizer, train_dl, val_dl,
-                             num_epochs=NUM_EPOCHS, name="baseline")
+                             num_epochs=NUM_EPOCHS, name="baseline",
+                             scheduler=scheduler)
 
-# %% 8. Evaluate
+# %% 8. Evaluate baseline model
 
 def plot_history(history, name):
     """Save train/val loss + accuracy curves to runs/<name>/curves.png."""
@@ -221,16 +226,15 @@ def full_eval(model, name, dls=None):
         plt.tight_layout()
         plt.show()
 
-# Reload the best checkpoint (highest val macro-F1) for reporting.
+# Reload the best  macro-F1 for reporting.
 if __name__ == "__main__":
     model.load_state_dict(torch.load("runs/baseline/best.pt", map_location=device))
     plot_history(baseline_history, "baseline")
     full_eval(model, "baseline")
 
-# %% 9. Attempt Image Augmentation, train for twice as long
+# %% 9. Train baseline model with augmentation
 
-# Reuse the matched preprocessing's crop size + normalization so the augmented
-# pipeline ends in the exact same value range the pretrained backbone expects.
+# Augmentation
 train_aug_transform = transforms.Compose([
     transforms.RandomResizedCrop(preprocess.crop_size[0], scale=(0.7, 1.0)),
     transforms.RandomHorizontalFlip(),
@@ -248,18 +252,21 @@ train_aug_dl = DataLoader(train_aug_ds, batch_size=BATCH_SIZE, shuffle=True,
 
 if __name__ == "__main__":
     model_aug = FlowerNet().to(device)
-    optimizer_aug = torch.optim.Adam(model_aug.parameters(), lr=LR)
+    optimizer_aug = torch.optim.AdamW(model_aug.parameters(), lr=LR, weight_decay=1e-4)
+    scheduler_aug = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer_aug, T_max=NUM_EPOCHS * 2)
     aug_history = train(model_aug, optimizer_aug, train_aug_dl, val_dl,
-                        num_epochs=NUM_EPOCHS * 2, name="aug")
+                        num_epochs=NUM_EPOCHS * 2, name="aug",
+                        scheduler=scheduler_aug)
 
-# %% 10. Evaluate augmented model
+# %% 10. Evaluate augmented baseline model
 
 if __name__ == "__main__":
     model_aug.load_state_dict(torch.load("runs/aug/best.pt", map_location=device))
     plot_history(aug_history, "aug")
     full_eval(model_aug, "aug")
 
-# %% 11. Attempt another model for transfer-learning
+# %% 11. EfficientNet model definition and dataloaders
 
 # Swap the backbone family entirely: EfficientNet-B0 (~5M params, mobile-inverted
 # bottlenecks) vs ResNet50 (~25M params, residual conv blocks). Same ImageNet
@@ -306,16 +313,20 @@ test_effnet_dl  = DataLoader(test_effnet_ds,  batch_size=BATCH_SIZE, shuffle=Fal
                              num_workers=NUM_WORKERS, pin_memory=False,
                              persistent_workers=NUM_WORKERS > 0)
 
-# %% 12. Train your new model
+# %% 12. Train EfficientNet model
 
 if __name__ == "__main__":
     model_effnet     = FlowerNetEffNet().to(device)
-    optimizer_effnet = torch.optim.Adam(model_effnet.parameters(), lr=LR)
+    optimizer_effnet = torch.optim.AdamW(model_effnet.parameters(),
+                                         lr=LR, weight_decay=1e-4)
+    scheduler_effnet = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer_effnet, T_max=NUM_EPOCHS * 2)
     effnet_history   = train(model_effnet, optimizer_effnet,
                              train_effnet_dl, val_effnet_dl,
-                             num_epochs=NUM_EPOCHS * 2, name="effnet")
+                             num_epochs=NUM_EPOCHS * 2, name="effnet",
+                             scheduler=scheduler_effnet)
 
-# %% 13. Evaluate the new model
+# %% 13. Evaluate EfficientNet model
 
 if __name__ == "__main__":
     model_effnet.load_state_dict(torch.load("runs/effnet/best.pt",
