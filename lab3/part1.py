@@ -3,12 +3,17 @@
 import json
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
-from sklearn.metrics import (accuracy_score, classification_report,
-                             confusion_matrix, f1_score)
+from sklearn.metrics import (
+        accuracy_score,
+        classification_report,
+        confusion_matrix,
+        f1_score
+    )
 from torch.utils.data import DataLoader
-from torchvision import datasets, models
+from torchvision import datasets, models, transforms
 
 # %% 1. Hyperparameters
 
@@ -166,15 +171,69 @@ def train(model, optimizer, train_dl, val_dl, num_epochs, name):
 # %% 7. Train baseline
 model = FlowerNet().to(device)
 
-# TODO: Write training code and save your results
+optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+baseline_history = train(model, optimizer, train_dl, val_dl,
+                         num_epochs=NUM_EPOCHS, name="baseline")
 
 # %% 8. Evaluate
 
-# TODO: Do full evaluation over all datasets
+def plot_history(history, name):
+    """Save train/val loss + accuracy curves to runs/<name>/curves.png."""
+    epochs = range(1, len(history["train_loss"]) + 1)
+    fig, (ax_loss, ax_acc) = plt.subplots(1, 2, figsize=(12, 4))
+
+    ax_loss.plot(epochs, history["train_loss"], label="train")
+    ax_loss.plot(epochs, history["val_loss"],   label="val")
+    ax_loss.set(xlabel="epoch", ylabel="loss", title=f"{name} - loss")
+    ax_loss.legend()
+
+    ax_acc.plot(epochs, history["train_acc"], label="train")
+    ax_acc.plot(epochs, history["val_acc"],   label="val")
+    ax_acc.set(xlabel="epoch", ylabel="accuracy", title=f"{name} - accuracy")
+    ax_acc.legend()
+
+    fig.tight_layout()
+    fig.savefig(Path("runs") / name / "curves.png", dpi=120, bbox_inches="tight")
+    plt.show()
+
+def full_eval(model, name):
+    """Report loss/accuracy/macro-F1 + classification report on all splits."""
+    for split_name, dl in [("train", train_dl), ("val", val_dl), ("test", test_dl)]:
+        m = evaluate(model, dl, labels)
+        print(f"\n=== {name} / {split_name} ===")
+        print(f"loss={m['loss']:.4f}  acc={m['accuracy']:.4f}  "
+              f"macro_f1={m['macro_f1']:.4f}")
+        print(m["report"])
+        print("confusion matrix (rows=true, cols=pred):")
+        print(m["cm"])
+
+# Reload the best checkpoint (highest val macro-F1) for reporting.
+model.load_state_dict(torch.load("runs/baseline/best.pt", map_location=device))
+plot_history(baseline_history, "baseline")
+full_eval(model, "baseline")
 
 # %% 9. Attempt Image Augmentation, train for twice as long
 
-# TODO: Write augmentation code, train and save your results.
+# Reuse the matched preprocessing's crop size + normalization so the augmented
+# pipeline ends in the exact same value range the pretrained backbone expects.
+train_aug_transform = transforms.Compose([
+    transforms.RandomResizedCrop(preprocess.crop_size[0], scale=(0.7, 1.0)),
+    transforms.RandomHorizontalFlip(),
+    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+    transforms.RandomRotation(15),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=preprocess.mean, std=preprocess.std),
+])
+
+train_aug_ds = datasets.ImageFolder("flower-splits/train",
+                                    transform=train_aug_transform)
+train_aug_dl = DataLoader(train_aug_ds, batch_size=BATCH_SIZE, shuffle=True,
+                          num_workers=NUM_WORKERS, pin_memory=True)
+
+model_aug = FlowerNet().to(device)
+optimizer_aug = torch.optim.Adam(model_aug.parameters(), lr=LR)
+aug_history = train(model_aug, optimizer_aug, train_aug_dl, val_dl,
+                    num_epochs=NUM_EPOCHS * 2, name="aug")
 
 # %% 10. Evaluate augmented model
 
