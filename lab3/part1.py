@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 from sklearn.metrics import (
+        ConfusionMatrixDisplay,
         accuracy_score,
         classification_report,
         confusion_matrix,
@@ -21,7 +22,7 @@ BATCH_SIZE = 32
 NUM_EPOCHS = 10
 LR = 1e-3
 NUM_CLASSES = 5
-NUM_WORKERS = 0
+NUM_WORKERS = 4
 SEED = 42
 
 if torch.backends.mps.is_available():
@@ -30,8 +31,6 @@ elif torch.cuda.is_available():
     device = torch.device("cuda")
 else:
     device = torch.device("cpu")
-
-print(device)
 
 torch.manual_seed(SEED)
 
@@ -48,11 +47,14 @@ test_ds  = datasets.ImageFolder("flower-splits/test",  transform=preprocess)
 labels = train_ds.classes
 
 train_dl = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True,
-                      num_workers=NUM_WORKERS, pin_memory=True)
+                      num_workers=NUM_WORKERS, pin_memory=False,
+                      persistent_workers=NUM_WORKERS > 0)
 val_dl   = DataLoader(val_ds,   batch_size=BATCH_SIZE, shuffle=False,
-                      num_workers=NUM_WORKERS, pin_memory=True)
+                      num_workers=NUM_WORKERS, pin_memory=False,
+                      persistent_workers=NUM_WORKERS > 0)
 test_dl  = DataLoader(test_ds,  batch_size=BATCH_SIZE, shuffle=False,
-                      num_workers=NUM_WORKERS, pin_memory=True)
+                      num_workers=NUM_WORKERS, pin_memory=False,
+                      persistent_workers=NUM_WORKERS > 0)
 
 #%% 3. Model implementation
 
@@ -108,11 +110,13 @@ def evaluate(model, dl, labels):
 
 # Sanity check: evaluate runs end-to-end on a freshly-instantiated model.
 # Pretrained backbone + random head -> predictions should be ~chance (~20%).
-_sanity = FlowerNet().to(device)
-_metrics = evaluate(_sanity, val_dl, labels)
-print(f"[sanity] untrained val: acc={_metrics['accuracy']:.4f} "
-      f"macro_f1={_metrics['macro_f1']:.4f} loss={_metrics['loss']:.4f}")
-del _sanity
+# Guarded so DataLoader workers don't re-run training when they re-import this file.
+if __name__ == "__main__":
+    _sanity = FlowerNet().to(device)
+    _metrics = evaluate(_sanity, val_dl, labels)
+    print(f"[sanity] untrained val: acc={_metrics['accuracy']:.4f} "
+          f"macro_f1={_metrics['macro_f1']:.4f} loss={_metrics['loss']:.4f}")
+    del _sanity
 
 # %% 6. Main train loop
 def infinite_iter(dl):
@@ -172,11 +176,12 @@ def train(model, optimizer, train_dl, val_dl, num_epochs, name):
     return history
 
 # %% 7. Train baseline
-model = FlowerNet().to(device)
+if __name__ == "__main__":
+    model = FlowerNet().to(device)
 
-optimizer = torch.optim.Adam(model.parameters(), lr=LR)
-baseline_history = train(model, optimizer, train_dl, val_dl,
-                         num_epochs=NUM_EPOCHS, name="baseline")
+    optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+    baseline_history = train(model, optimizer, train_dl, val_dl,
+                             num_epochs=NUM_EPOCHS, name="baseline")
 
 # %% 8. Evaluate
 
@@ -199,21 +204,28 @@ def plot_history(history, name):
     fig.savefig(Path("runs") / name / "curves.png", dpi=120, bbox_inches="tight")
     plt.show()
 
-def full_eval(model, name):
+def full_eval(model, name, dls=None):
     """Report loss/accuracy/macro-F1 + classification report on all splits."""
-    for split_name, dl in [("train", train_dl), ("val", val_dl), ("test", test_dl)]:
+    if dls is None:
+        dls = [("train", train_dl), ("val", val_dl), ("test", test_dl)]
+    for split_name, dl in dls:
         m = evaluate(model, dl, labels)
         print(f"\n=== {name} / {split_name} ===")
         print(f"loss={m['loss']:.4f}  acc={m['accuracy']:.4f}  "
               f"macro_f1={m['macro_f1']:.4f}")
         print(m["report"])
-        print("confusion matrix (rows=true, cols=pred):")
-        print(m["cm"])
+        disp = ConfusionMatrixDisplay(confusion_matrix=m["cm"],
+                                      display_labels=labels)
+        disp.plot(cmap="Blues", values_format="d", xticks_rotation=45)
+        plt.title(f"{name} / {split_name}")
+        plt.tight_layout()
+        plt.show()
 
 # Reload the best checkpoint (highest val macro-F1) for reporting.
-model.load_state_dict(torch.load("runs/baseline/best.pt", map_location=device))
-plot_history(baseline_history, "baseline")
-full_eval(model, "baseline")
+if __name__ == "__main__":
+    model.load_state_dict(torch.load("runs/baseline/best.pt", map_location=device))
+    plot_history(baseline_history, "baseline")
+    full_eval(model, "baseline")
 
 # %% 9. Attempt Image Augmentation, train for twice as long
 
@@ -231,18 +243,21 @@ train_aug_transform = transforms.Compose([
 train_aug_ds = datasets.ImageFolder("flower-splits/train",
                                     transform=train_aug_transform)
 train_aug_dl = DataLoader(train_aug_ds, batch_size=BATCH_SIZE, shuffle=True,
-                          num_workers=NUM_WORKERS, pin_memory=True)
+                          num_workers=NUM_WORKERS, pin_memory=False,
+                          persistent_workers=NUM_WORKERS > 0)
 
-model_aug = FlowerNet().to(device)
-optimizer_aug = torch.optim.Adam(model_aug.parameters(), lr=LR)
-aug_history = train(model_aug, optimizer_aug, train_aug_dl, val_dl,
-                    num_epochs=NUM_EPOCHS * 2, name="aug")
+if __name__ == "__main__":
+    model_aug = FlowerNet().to(device)
+    optimizer_aug = torch.optim.Adam(model_aug.parameters(), lr=LR)
+    aug_history = train(model_aug, optimizer_aug, train_aug_dl, val_dl,
+                        num_epochs=NUM_EPOCHS * 2, name="aug")
 
 # %% 10. Evaluate augmented model
 
-model_aug.load_state_dict(torch.load("runs/aug/best.pt", map_location=device))
-plot_history(aug_history, "aug")
-full_eval(model_aug, "aug")
+if __name__ == "__main__":
+    model_aug.load_state_dict(torch.load("runs/aug/best.pt", map_location=device))
+    plot_history(aug_history, "aug")
+    full_eval(model_aug, "aug")
 
 # %% 11. Attempt another model for transfer-learning
 
@@ -282,33 +297,31 @@ test_effnet_ds  = datasets.ImageFolder("flower-splits/test",
                                        transform=effnet_preprocess)
 
 train_effnet_dl = DataLoader(train_effnet_ds, batch_size=BATCH_SIZE, shuffle=True,
-                             num_workers=NUM_WORKERS, pin_memory=False)
+                             num_workers=NUM_WORKERS, pin_memory=False,
+                             persistent_workers=NUM_WORKERS > 0)
 val_effnet_dl   = DataLoader(val_effnet_ds,   batch_size=BATCH_SIZE, shuffle=False,
-                             num_workers=NUM_WORKERS, pin_memory=False)
+                             num_workers=NUM_WORKERS, pin_memory=False,
+                             persistent_workers=NUM_WORKERS > 0)
 test_effnet_dl  = DataLoader(test_effnet_ds,  batch_size=BATCH_SIZE, shuffle=False,
-                             num_workers=NUM_WORKERS, pin_memory=False)
+                             num_workers=NUM_WORKERS, pin_memory=False,
+                             persistent_workers=NUM_WORKERS > 0)
 
 # %% 12. Train your new model
 
-model_effnet     = FlowerNetEffNet().to(device)
-optimizer_effnet = torch.optim.Adam(model_effnet.parameters(), lr=LR)
-effnet_history   = train(model_effnet, optimizer_effnet,
-                         train_effnet_dl, val_effnet_dl,
-                         num_epochs=NUM_EPOCHS * 2, name="effnet")
+if __name__ == "__main__":
+    model_effnet     = FlowerNetEffNet().to(device)
+    optimizer_effnet = torch.optim.Adam(model_effnet.parameters(), lr=LR)
+    effnet_history   = train(model_effnet, optimizer_effnet,
+                             train_effnet_dl, val_effnet_dl,
+                             num_epochs=NUM_EPOCHS * 2, name="effnet")
 
 # %% 13. Evaluate the new model
 
-model_effnet.load_state_dict(torch.load("runs/effnet/best.pt", map_location=device))
-plot_history(effnet_history, "effnet")
-
-# full_eval uses the ResNet dataloaders; inline the loop with EffNet's instead.
-for split_name, dl in [("train", train_effnet_dl),
-                       ("val",   val_effnet_dl),
-                       ("test",  test_effnet_dl)]:
-    m = evaluate(model_effnet, dl, labels)
-    print(f"\n=== effnet / {split_name} ===")
-    print(f"loss={m['loss']:.4f}  acc={m['accuracy']:.4f}  "
-          f"macro_f1={m['macro_f1']:.4f}")
-    print(m["report"])
-    print("confusion matrix (rows=true, cols=pred):")
-    print(m["cm"])
+if __name__ == "__main__":
+    model_effnet.load_state_dict(torch.load("runs/effnet/best.pt",
+                                            map_location=device))
+    plot_history(effnet_history, "effnet")
+    full_eval(model_effnet, "effnet",
+              dls=[("train", train_effnet_dl),
+                   ("val",   val_effnet_dl),
+                   ("test",  test_effnet_dl)])
